@@ -1,0 +1,615 @@
+<html charset="UTF-8">
+
+<head>
+<script src="libs/three.js"></script>
+<script src="libs/keyboard.js"></script>
+<script src="libs/OrbitControls.js"></script>
+</head>
+
+<body style="margin: 0">
+
+<script>
+	var renderer;
+	var scene;
+	var camera;
+	var spotLight;
+	var ambientLight;
+	
+	//Sounds provided by freesound.org, Super Smash Bros. Melee, and Gloria Estefan
+	//Ball collision sounds provided class lecture notes
+	var conga, one, two, three, four, five;
+	var applause1, applause2, applause3;
+	var ouch1, ouch2, ouch3;
+	var win, lose;
+	function loadSounds()
+	{
+		conga = new Audio("sounds/Conga.mp3");
+		conga.volume = .6;
+		conga.loop = true;
+		conga.play();
+		
+		one = new Audio("sounds/1.mp3");
+		two = new Audio("sounds/2.mp3");
+		three = new Audio("sounds/3.mp3");
+		four = new Audio("sounds/4.mp3");
+		five = new Audio("sounds/5.mp3");
+		
+		applause1 = new Audio("sounds/applause1.mp3");
+		applause1.volume = .4
+		applause2 = new Audio("sounds/applause2.mp3");
+		applause2.volume = .4;
+		applause3 = new Audio("sounds/applause3.mp3");
+		applause3.volume = .4;
+		
+		ouch1 = new Audio("sounds/ouch1.mp3");
+		ouch1.volume = .4;
+		ouch2 = new Audio("sounds/ouch2.mp3");
+		ouch2.volume = .4;
+		ouch3 = new Audio("sounds/ouch3.mp3");
+		ouch3.volume = .4;
+		
+		win = new Audio("sounds/win.mp3");
+		win.volume = .4;
+		lose = new Audio("sounds/lose.mp3");
+		lose.volume = .4;
+	}
+	
+	   
+
+
+
+	function init()
+	{
+		loadSounds();
+		
+		scene = new THREE.Scene();
+		
+		addCamera();
+		addRenderer();
+		addSpotLight();
+				
+		// 1. show a plane representing the bottom of the pong table
+		createBoard();
+		
+		// 2. Create sideboards, which will be parallelapipeds
+		createWalls();
+
+		// 3. Create the paddles
+		createPaddles();
+		
+		// 4 Create the ball
+		createBall();
+		
+		// Creates scoreboards for player and computer
+		createScoreboards();
+		createTitles();
+		
+		//Orbit Controls used to change camera and object position using mouse
+		new THREE.OrbitControls(camera, renderer.domElement);
+		
+		//Allows for window resize of field; scales with size of the window
+		window.addEventListener('resize', onResize, false);
+
+		document.body.appendChild( renderer.domElement );		
+		render();
+		updateScore();
+	}
+	
+	
+	var firstFrame = true;
+	var justLost = false;
+	var justWon = false;
+	function render()
+	{
+		// 5. Animate the game
+		gamePlay();
+		
+		requestAnimationFrame( render );
+		renderer.render( scene, camera );
+		
+		if (firstFrame) {
+			beginInfo();
+			firstFrame = false;
+		}
+		
+		if(justWon){
+			justWon = false;
+			alert("YOU WIN! :) Press OK to play again!");
+		}
+		if(justLost) {
+			justLost = false;
+			alert("YOU LOST! :( Press OK to play again!");
+		}
+	}
+	
+	//Will allow for game to adjust size to match the window's current size.
+	function onResize() 
+	{
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+		renderer.setSize(window.innerWidth, window.innerHeight);
+	}
+	
+	//Textbox giving instructions on how to play the game.
+	function beginInfo()
+	{
+		alert("Welcome to Pong! Use the 'A' and 'D' Keys to move left and right!\nHold Left click to rotate the field, Hold Right click to change the field's position, and scroll up or down to zoom!");
+	}
+
+	//Adds camera used to look at game
+	function addCamera()
+	{
+		camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 1000 );
+		camera.position.x = 0;
+		camera.position.y = -20;
+		camera.position.z = 10;
+		camera.lookAt( scene.position );
+	}
+
+	//Adds renderer used for render()
+	function addRenderer()
+	{
+		renderer = new THREE.WebGLRenderer({antialias: true});
+		renderer.setClearColor( 0x000000, 1.0 );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		renderer.shadowMap.enabled = true;
+		renderer.shadowMapSoft = true;
+	}
+	
+	//Adds spotlight for the shadows
+	function addSpotLight()
+	{
+		spotLight = new THREE.SpotLight( 0xffffff, 2);
+        spotLight.position.set(7, 0, 23);
+		spotLight.angle = 0.7;
+		spotLight.distance = 30;
+		spotLight.penumbra = 0;
+		spotLight.decay = 0.5;
+		spotLight.shadow.camera.visible = true;
+        spotLight.shadow.camera.near = 20;
+        spotLight.shadow.camera.far = 30;
+		spotLight.shadow.mapSize.width = 2048;
+		spotLight.shadow.mapSize.height = 2048;
+		spotLight.shadow.camera.right = 10;
+		spotLight.shadow.camera.left = -10;
+		spotLight.shadow.camera.top = 5;
+		spotLight.shadow.camera.bottom = -5;
+
+        spotLight.castShadow = true;
+        scene.add(spotLight);
+		
+		var ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+		scene.add(ambientLight);
+		
+		//scene.add(new THREE.SpotLightHelper(spotLight));
+		//scene.add(new THREE.CameraHelper(spotLight.shadow.camera));
+	}
+	
+	//Creates Board, contains white center line where ball is placed
+	function createBoard ()
+	{
+		var planeGeometry = new THREE.PlaneGeometry(10, 9.75, 10, 10);
+		var planeMaterial = new THREE.MeshLambertMaterial({color:0x81D4F4});
+		var plane1 = new THREE.Mesh(planeGeometry, planeMaterial);
+		var plane2 = new THREE.Mesh(planeGeometry, planeMaterial);
+		plane1.position.set(0, 5, 0);
+		plane2.position.set(0, -5, 0);
+		
+		plane1.castShadow = true;
+		plane1.receiveShadow = true;
+		plane2.castShadow = true;
+		plane2.receiveShadow = true;
+		
+		scene.add(plane1);
+		scene.add(plane2);
+		
+		var lineGeometry = new THREE.PlaneGeometry(10, .5);
+		var lineMaterial = new THREE.MeshLambertMaterial({color:0xffffff});
+		var line = new THREE.Mesh(lineGeometry, lineMaterial);
+		
+		line.castShadow = true;
+		line.receiveShadow = true;
+		
+		scene.add(line);
+	}
+	
+	//Creates walls that surround the sides of the board
+	function createWalls()
+	{
+		var Wall = new THREE.BoxGeometry(.5, 19.75, 2);
+		var wallMaterial = new THREE.MeshLambertMaterial({color:0xB3E5FC});
+		
+		var wall1 = new THREE.Mesh(Wall, wallMaterial);
+		wall1.position.x = -5;
+		wall1.position.z = 1.0;
+		var wall2 = new THREE.Mesh(Wall, wallMaterial);
+		wall2.position.x = 5;
+		wall2.position.z = 1.0;
+		
+		wall1.castShadow = true;
+		wall1.receiveShadow = true;
+		wall2.castShadow = true;
+		wall2.receiveShadow = true;
+		
+		scene.add(wall1);
+		scene.add(wall2);
+	}
+	
+	//Creates paddles used for game
+	var paddle1; //computer paddle
+	var paddle2; //player paddle
+	function createPaddles()
+	{
+		var paddle = new THREE.BoxGeometry(2, .35, 1.25);
+		var paddleMaterial = new THREE.MeshLambertMaterial({color:0xFF80AB});
+		
+		paddle1 = new THREE.Mesh(paddle, paddleMaterial);
+		paddle1.position.y = 9.70;
+		paddle1.position.z = 0.625;
+		
+		paddle2 = new THREE.Mesh(paddle, paddleMaterial);
+		paddle2.position.y = -9.70;
+		paddle2.position.z = 0.625;
+		
+		paddle1.castShadow = true;
+		paddle1.receiveShadow = true;
+		paddle2.castShadow = true;
+		paddle2.receiveShadow = true;
+		
+		scene.add(paddle1);
+		scene.add(paddle2);
+	}
+	
+	//Creates ball used for game
+	var ball;
+	function createBall()
+	{
+		var ballSphere = new THREE.SphereGeometry(.5, 32, 32);
+		var ballMaterial = new THREE.MeshLambertMaterial({color:0xFFE57F});
+		ball = new THREE.Mesh(ballSphere, ballMaterial);
+		ball.position.z = .5;
+		
+		ball.castShadow = true;
+		ball.receiveShadow = true;
+		
+		scene.add(ball);
+	}
+	
+	//Scoreboards used for displaying player and computer score
+	function createScoreboards()
+	{
+		var boardGeometry = new THREE.BoxGeometry(4.5, 0.2, 5.75);
+		var boardMaterial = new THREE.MeshBasicMaterial({color:0xF8BBD0});
+		
+		var playerboard = new THREE.Mesh(boardGeometry, boardMaterial);
+		var computerboard = new THREE.Mesh(boardGeometry, boardMaterial);
+		
+		playerboard.position.x = -9;
+		playerboard.position.y = 12;
+		playerboard.position.z = 2.75;
+		
+		computerboard.position.x = 9;
+		computerboard.position.y = 12;
+		computerboard.position.z = 2.75;
+		
+		playerboard.castShadow = true;
+		playerboard.receiveShadow = true;
+		computerboard.castShadow = true;
+		computerboard.receiveShadow = true;
+		
+		scene.add(playerboard);
+		scene.add(computerboard);
+		
+		var boardUnderline = new THREE.BoxGeometry(4.25 , .65, .2);
+		var underlineMaterial = new THREE.MeshLambertMaterial({color: 0xB388FF});
+		
+		var playerUnder1 = new THREE.Mesh(boardUnderline, underlineMaterial);
+		var computerUnder1 = new THREE.Mesh(boardUnderline, underlineMaterial);
+		
+		playerUnder1.position.set(-9, 11.65, .85);
+		computerUnder1.position.set(9, 11.65, .85);
+		
+		var playerUnder2 = new THREE.Mesh(boardUnderline, underlineMaterial);
+		var computerUnder2 = new THREE.Mesh(boardUnderline, underlineMaterial);
+
+		playerUnder2.position.set(-9, 11.65, 4.65);
+		computerUnder2.position.set(9, 11.65, 4.65);
+		
+		playerUnder1.castShadow = true;
+		playerUnder1.receiveShadow = true;
+		computerUnder1.castShadow = true;
+		computerUnder1.receiveShadow = true;
+		playerUnder2.castShadow = true;
+		playerUnder2.receiveShadow = true;
+		computerUnder2.castShadow = true;
+		computerUnder2.receiveShadow = true;
+		
+		scene.add(playerUnder1);
+		scene.add(computerUnder1);
+		scene.add(playerUnder2);
+		scene.add(computerUnder2);
+	}
+	
+	
+	//Heading titles for the player and computer boards holding the score.
+	function createTitles()
+	{
+		var loader = new THREE.FontLoader();
+		var textMaterial = new THREE.MeshLambertMaterial({color: 0xB388FF});
+		
+		loader.load('fonts/Broadway_Regular.json', function (font) {
+			var playerTextGeometry = new THREE.TextGeometry("PLAYER", {
+				font: font,
+				
+				size: .65,
+				height: 0.65,
+				curveSegments: 10,
+				
+				bevelEnabled: false
+			});
+		
+			var playerText = new THREE.Mesh(playerTextGeometry, textMaterial);
+			playerText.position.set(-10.87, 11.85, 4.9);
+			playerText.rotation.x =  Math.PI / 2;
+		
+			scene.add(playerText);
+			
+			var cpuTextGeometry = new THREE.TextGeometry("CPU", {
+				font: font,
+				
+				size: .65,
+				height: 0.65,
+				curveSegments: 10,
+				
+				bevelEnabled: false
+			});
+		
+			var cpuText = new THREE.Mesh(cpuTextGeometry, textMaterial);
+			cpuText.position.set(7.95, 11.85, 4.9);
+			cpuText.rotation.x =  Math.PI / 2;
+		
+			scene.add(cpuText);
+		} );
+	}
+	
+	
+	//Updates the score of both player and computer.
+	var playerScoreObject = null;
+	var cpuScoreObject = null;
+	var playerScore = 0;
+	var cpuScore = 0;
+	function updateScore() 
+	{		
+		var playerString;
+		var cpuString;
+		
+		if(playerScore < 10)
+			playerString = "0" + playerScore;
+		else
+			playerString = "" + playerScore;
+			
+		if(cpuScore < 10)
+			cpuString = "0" + cpuScore;
+		else	
+			cpuString = "" + cpuScore;
+			
+		var loader = new THREE.FontLoader();
+		var textMaterial = new THREE.MeshLambertMaterial({color: 0xB388FF});
+		
+		loader.load('fonts/Broadway_Regular.json', function (font) {
+			var playerTextGeometry = new THREE.TextGeometry(playerString, {
+				font: font,
+				
+				size: 2.45,
+				height: 0.65,
+				curveSegments: 10,
+				
+				bevelEnabled: false
+			});
+		
+			playerScoreObject = new THREE.Mesh(playerTextGeometry, textMaterial);
+			playerScoreObject.position.set(-11.1, 11.85, 1.3);
+			playerScoreObject.rotation.x =  Math.PI / 2;
+		
+			scene.add(playerScoreObject);
+			
+			var cpuTextGeometry = new THREE.TextGeometry(cpuString, {
+				font: font,
+				
+				size: 2.45,
+				height: 0.65,
+				curveSegments: 10,
+				
+				bevelEnabled: false
+			});
+		
+			cpuScoreObject = new THREE.Mesh(cpuTextGeometry, textMaterial);
+			cpuScoreObject.position.set(6.7, 11.85, 1.3);
+			cpuScoreObject.rotation.x =  Math.PI / 2;
+		
+			scene.add(cpuScoreObject);
+		} );
+	
+	
+		if (playerScoreObject != null)
+			scene.remove(playerScoreObject);
+		if (cpuScoreObject != null)
+			scene.remove(cpuScoreObject);
+	}
+	
+	
+	
+	var xDir = .09;
+	var yDir = .10;
+	var ySpeed = .015;
+	function gamePlay()
+	{
+		ball.position.x += xDir;
+		ball.position.y += yDir;
+		
+		//Movement of player paddle. Paddle will stop movement once it hits a wall
+		if(Key.isDown(Key.A)){
+			paddle2.position.x -= 0.06;
+			
+			if(paddle2.position.x <= -3.77)
+				paddle2.position.x = -3.77;
+		}
+		else if(Key.isDown(Key.D)){
+			paddle2.position.x += 0.06;
+			
+			if(paddle2.position.x >= 3.77)
+				paddle2.position.x = 3.77;
+		}
+		
+		//Ball hits a wall. Random sound will play once wall is hit.
+		if(ball.position.x < -4.25){
+						
+			xDir = 0.09;
+
+			
+			if(Math.round(Math.random()*10) % 2 == 0)
+				three.play();
+			else
+				four.play();
+		}
+		else if(ball.position.x > 4.25){
+			
+			xDir = -0.09;
+			
+			if(Math.round(Math.random()*10) % 2 == 0)
+				four.play();
+			else
+				three.play();
+		}
+		
+		//Ball hits paddle. Depending on location of paddle and ball collision, ball will
+		//travel in different direction. The speed of the ball increases after every collision.
+		if(ball.position.y < -9.00 && yDir < 0){
+			yDir = (0.08 + ySpeed);
+			ySpeed = ySpeed + .015;
+			
+			if(Math.abs(paddle2.position.x - ball.position.x) <= 1.9){
+				
+				if(ball.position.x <= (paddle2.position.x)-.15)
+					xDir = -.09;
+				else if(ball.position.x > (paddle2.position.x)-.15 && ball.position.x <= (paddle2.position.x)+.15){
+					xDir = 0;
+					yDir = (0.08 + ySpeed);
+					ySpeed += .015;
+				}
+				else
+					xDir = .09;
+				
+				one.play();
+			}
+			else{
+				ball.position.x = ball.position.y = 0;
+				xDir = -.09;
+				yDir = -.10;
+				ySpeed = .015;
+				
+				cpuScore++;
+				updateScore();
+				
+				if(Math.round(Math.random()*10) % 3 == 2)
+					ouch3.play();
+				else if(Math.round(Math.random()*10) % 3 == 1)
+					ouch2.play();
+				else
+					ouch1.play();
+				
+				//If scores of 10 is reached, game is over and will reset.
+				if(cpuScore == 10){
+					lose.play();
+					playerScore = 0;
+					cpuScore = 0;
+					//updateScore();
+					playerScoreObject = null;
+					cpuScoreObject = null;
+					
+					justLost = true;
+				}
+			}
+		}
+		
+		//Ball hits opponent paddle. Depending on location of paddle and ball collision, ball will
+		//travel in different direction. The speed of the ball increases after every collision.
+		else if(ball.position.y > 9.00 && yDir > 0){
+			yDir = -(0.08 + ySpeed);
+			ySpeed += .015;
+			
+			if(Math.abs(paddle1.position.x - ball.position.x) <= 1.9){
+				
+				if(ball.position.x <= (paddle1.position.x)-.15)
+					xDir = -.09;
+				else if(ball.position.x > (paddle1.position.x)-.15 && ball.position.x <= (paddle1.position.x)+.15){
+					if(Math.round(Math.random()*10) % 2 == 0)
+						xDir = .09;
+					else
+						xDir = -.09;
+				}
+				else
+					xDir = .09;
+								
+				two.play();
+			}
+			else{
+				ball.position.x = ball.position.y = 0;
+				xDir = .09;
+				yDir = .10;
+				ySpeed = .015;
+				
+				playerScore++;
+				updateScore();
+				
+				if(Math.round(Math.random()*10) % 3 == 2)
+					applause1.play();
+				else if(Math.round(Math.random()*10) % 3 == 1)
+					applause2.play();
+				else
+					applause3.play();	
+
+				//If score reaches 10, game is reset
+				if(playerScore == 10){
+					win.play();
+					playerScore = 0;
+					cpuScore = 0;
+					//updateScore();
+					playerScoreObject = null;
+					cpuScoreObject = null;
+					
+					justWon = true;
+					
+				}
+			}
+		}
+		
+		
+		//Opponent paddle will track the ball depending on the ball's current location
+		if(paddle1.position.x - ball.position.x > 0){
+			paddle1.position.x -= 0.0475;
+		}
+		else if(paddle1.position.x - ball.position.x < 0){
+			paddle1.position.x += 0.0475;
+		}
+		else if(paddle1.position.x == ball.position.x){
+			paddle1.position.x = ball.position.x;
+		}
+		
+		//Opponent paddle will stop movement at edge of walls
+		if(paddle1.position.x >= 3.77){
+			paddle1.position.x = 3.77;
+		}
+		else if(paddle1.position.x <= -3.77){
+			paddle1.position.x = -3.77;
+		}
+	}
+	
+	
+	
+	window.onload = init;
+</script>
+
+</body>
+
+</html>
